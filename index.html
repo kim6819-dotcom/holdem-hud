@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HUD">
+<meta name="theme-color" content="#07080d">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>♠ Hold'em HUD</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♠</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700;800&family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{background:#07080d;color:#e4e6f0;font-family:'Outfit',sans-serif;user-select:none}
+.mono{font-family:'JetBrains Mono',monospace}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.06);border-radius:4px}
+
+/* ── APP SHELL ── */
+.app{display:flex;flex-direction:column;height:100vh;max-height:100vh;padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+
+/* ── TOP BAR: CARDS + CONTROLS ── */
+.topbar{display:flex;align-items:center;gap:8px;padding:8px 14px;background:linear-gradient(180deg,#0d0e16,#090a10);border-bottom:1px solid rgba(255,255,255,0.04);flex-shrink:0;min-height:60px}
+.logo{font-size:15px;font-weight:900;background:linear-gradient(135deg,#f0c040,#e09020);-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-.3px;flex-shrink:0}
+.cards-row{display:flex;align-items:center;gap:4px;flex:1;min-width:0}
+.card-slot{width:44px;height:58px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:.1s;flex-shrink:0;position:relative}
+.card-slot.empty{border:2px dashed rgba(255,255,255,0.15);background:rgba(255,255,255,0.015)}
+.card-slot.hero{border:2px solid #f0c040;background:linear-gradient(150deg,#1a1608,#100e08);box-shadow:0 0 12px rgba(240,192,64,0.08)}
+.card-slot.board{border:2px solid #4488dd;background:linear-gradient(150deg,#080e1a,#0a0c14);box-shadow:0 0 12px rgba(68,136,221,0.06)}
+.card-slot .rank{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:800;line-height:1}
+.card-slot .suit{font-size:14px;line-height:1}
+.card-slot .x-btn{position:absolute;top:-4px;right:-4px;width:16px;height:16px;border-radius:50%;background:rgba(255,60,60,0.8);color:#fff;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;opacity:0;transition:.1s;cursor:pointer}
+.card-slot:hover .x-btn{opacity:1}
+.card-slot .slot-lbl{font-size:8px;color:rgba(255,255,255,0.5);letter-spacing:.5px;font-weight:700}
+.sep{width:1px;height:36px;background:rgba(255,255,255,0.15);flex-shrink:0}
+.stage-badge{padding:3px 10px;border-radius:14px;font-size:11px;font-weight:800;letter-spacing:.5px;flex-shrink:0}
+.ctrl-group{display:flex;align-items:center;gap:4px;flex-shrink:0;margin-left:auto}
+.ctrl-group label{font-size:10px;color:rgba(255,255,255,0.7);font-weight:700;letter-spacing:.5px}
+.opp-btn{width:28px;height:28px;border-radius:7px;border:1.5px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.03);color:rgba(255,255,255,0.65);font-size:13px;font-weight:800;font-family:'JetBrains Mono',monospace;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.08s}
+.opp-btn:hover{border-color:rgba(255,255,255,0.15);color:#fff}
+.opp-btn.on{border-color:#f0c040;background:rgba(240,192,64,0.1);color:#f0c040}
+.reset-btn{height:36px;border-radius:10px;border:2px solid rgba(255,60,60,0.25);background:rgba(255,60,60,0.06);color:#ff5555;font-size:13px;font-weight:900;padding:0 14px;cursor:pointer;transition:.08s;font-family:'Outfit',sans-serif;letter-spacing:.5px;margin-left:10px;flex-shrink:0}
+.reset-btn:hover{background:rgba(255,60,60,0.18);border-color:rgba(255,60,60,0.5)}
+
+/* ── SUIT COLORS ── */
+.c-s{color:#b0ccee}.c-h{color:#ff4050}.c-d{color:#5ab0ff}.c-c{color:#40dd70}
+
+/* ── HERO DISPLAY (WIN RATE + ACTION) ── */
+.hero-display{display:flex;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,0.03);padding:8px 18px;gap:20px;align-items:flex-start;flex-wrap:wrap}
+.hero-sec-wr{display:flex;flex-direction:column;gap:2px}
+.hero-sec-act{display:flex;flex-direction:column;gap:2px;min-width:200px}
+.hero-sec-pos{display:flex;flex-direction:column;gap:2px}
+.wr-big{display:flex;align-items:baseline;gap:6px}
+.wr-big .num{font-family:'JetBrains Mono',monospace;font-size:52px;font-weight:800;line-height:1;letter-spacing:-2px}
+.wr-big .pct{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:600;opacity:.8}
+.wr-big .lbl{font-size:13px;font-weight:700;color:rgba(255,255,255,0.65);margin-left:2px}
+.wr-sub{display:flex;gap:16px;margin-top:2px}
+.wr-sub .item{display:flex;align-items:baseline;gap:4px}
+.wr-sub .item .l{font-size:11px;color:rgba(255,255,255,0.65);font-weight:600}
+.wr-sub .item .v{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700}
+.wr-meta{font-size:10px;color:rgba(255,255,255,0.45);margin-top:1px;font-family:'JetBrains Mono',monospace}
+.action-bar{display:flex;align-items:center;gap:12px;padding:6px 14px;border-radius:10px}
+.action-bar .act{font-size:28px;font-weight:900;letter-spacing:-0.5px}
+.action-bar .bb{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;opacity:.9}
+.action-bar .reason{font-size:11px;opacity:.7;font-weight:600;margin-top:1px}
+.act-fold{background:rgba(255,50,50,0.06);border:1.5px solid rgba(255,60,60,0.12)}
+.act-fold .act{color:#ff4444}
+.act-allin{background:rgba(240,192,64,0.06);border:1.5px solid rgba(240,192,64,0.18)}
+.act-allin .act{color:#f0c040;text-shadow:0 0 20px rgba(240,192,64,0.25)}
+.act-allin .bb{color:#f0c040}
+.act-raise{background:rgba(48,200,90,0.05);border:1.5px solid rgba(48,200,90,0.15)}
+.act-raise .act{color:#30c860}
+.act-raise .bb{color:#30c860}
+.act-check{background:rgba(70,140,255,0.05);border:1.5px solid rgba(70,140,255,0.12)}
+.act-check .act{color:#4a9eff}
+.act-call{background:rgba(170,150,255,0.05);border:1.5px solid rgba(170,150,255,0.12)}
+.act-call .act{color:#b09dff}
+.act-call .bb{color:#b09dff}
+.act-empty{background:rgba(255,255,255,0.01);border:1.5px dashed rgba(255,255,255,0.04)}
+.hand-name{font-size:13px;font-weight:800;letter-spacing:.3px;margin-bottom:2px}
+.tier-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:800;letter-spacing:.3px;margin-left:6px}
+
+/* Position grid */
+.pos-grid{display:grid;grid-template-columns:1fr 1fr;gap:3px}
+.pos-cell{border-radius:6px;padding:4px 8px;background:rgba(0,0,0,0.25);display:flex;justify-content:space-between;align-items:center;gap:4px;min-width:130px}
+.pos-cell .pn{font-size:11px;color:rgba(255,255,255,0.7);font-weight:600}
+.pos-cell .pa{font-size:12px;font-weight:800}
+.pos-cell .pb{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;opacity:.8}
+.st-raise{color:#30c860}.st-call{color:#f0c040}.st-fold{color:#ff4444}
+
+/* ── FREQ BAR ── */
+.freq-bar{display:flex;gap:6px;align-items:center;margin-top:3px}
+.freq-track{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,0.06);overflow:hidden;display:flex}
+.freq-fill-bet{height:100%;background:#30c860;border-radius:3px 0 0 3px;transition:width .2s}
+.freq-fill-chk{height:100%;background:rgba(255,255,255,0.12);border-radius:0 3px 3px 0}
+.freq-lbl{font-family:'JetBrains Mono',monospace;font-size:10px;font-weight:700;white-space:nowrap}
+/* ── TURN PLAN ── */
+.turn-plan{font-size:11px;color:rgba(255,255,255,0.7);padding:3px 8px;border-radius:6px;background:rgba(74,158,255,0.06);border-left:2px solid #4a9eff;margin-top:3px}
+.turn-plan .tp-lbl{font-size:9px;color:#4a9eff;font-weight:800;letter-spacing:.5px}
+/* ── EXPLOIT TOGGLE ── */
+.exploit-row{display:flex;gap:4px;align-items:center;flex-shrink:0}
+.ex-btn{padding:3px 10px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;border:1.5px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02);color:rgba(255,255,255,0.6);transition:.08s;font-family:'Outfit',sans-serif}
+.ex-btn:hover{border-color:rgba(255,255,255,0.15);color:#fff}
+.ex-btn.ex-gto{border-color:rgba(48,200,96,0.3);background:rgba(48,200,96,0.06);color:#30c860}
+.ex-btn.ex-fold{border-color:rgba(255,68,68,0.3);background:rgba(255,68,68,0.06);color:#ff4444}
+.ex-btn.ex-call{border-color:rgba(240,192,64,0.3);background:rgba(240,192,64,0.06);color:#f0c040}
+.exploit-hint{font-size:10px;color:rgba(255,255,255,0.55);font-weight:600}
+/* ── IP/OOP Toggle ── */
+.pos-toggle{display:flex;gap:4px;align-items:center;flex-shrink:0}
+.pt-btn{padding:3px 12px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;border:1.5px solid rgba(255,255,255,0.08);background:rgba(255,255,255,0.02);color:rgba(255,255,255,0.5);transition:.08s;font-family:'JetBrains Mono',monospace}
+.pt-btn:hover{border-color:rgba(255,255,255,0.15);color:#fff}
+.pt-btn.pt-ip{border-color:rgba(48,200,96,0.4);background:rgba(48,200,96,0.08);color:#30c860}
+.pt-btn.pt-oop{border-color:rgba(176,157,255,0.4);background:rgba(176,157,255,0.08);color:#b09dff}
+/* ── Villain Bet Size ── */
+.vb-row{display:flex;gap:3px;align-items:center;flex-shrink:0}
+.vb-lbl{font-size:9px;color:rgba(255,255,255,0.45);font-weight:700;letter-spacing:.3px;margin-right:2px}
+.vb-btn{padding:3px 8px;border-radius:7px;font-size:10px;font-weight:800;cursor:pointer;border:1.5px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:rgba(255,255,255,0.45);transition:.08s;font-family:'JetBrains Mono',monospace}
+.vb-btn:hover{border-color:rgba(255,255,255,0.15);color:#fff}
+.vb-btn.vb-on{border-color:rgba(255,160,40,0.5);background:rgba(255,160,40,0.1);color:#ffa028}
+/* ── Bluff Info ── */
+.bluff-info{font-size:10px;color:rgba(255,255,255,0.65);padding:3px 8px;border-radius:6px;background:rgba(255,68,68,0.06);border-left:2px solid rgba(255,68,68,0.4);margin-top:3px;font-weight:600}
+
+/* ── CARD DECK ── */
+.deck-area{flex:1;min-height:0;display:flex;flex-direction:column;padding:6px 10px;gap:4px}
+.deck-label{font-size:10px;color:rgba(255,255,255,0.5);font-weight:700;letter-spacing:1px;text-align:center}
+.deck{display:grid;grid-template-columns:repeat(13,1fr);gap:4px;flex:1;min-height:0}
+.cd{border-radius:9px;border:2px solid rgba(255,255,255,0.08);background:linear-gradient(155deg,#12132a,#161736);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;transition:.06s;position:relative}
+.cd:hover:not(.cd-off){border-color:rgba(255,255,255,0.2);transform:translateY(-3px);background:linear-gradient(155deg,#1a1b35,#1e1f42);z-index:2}
+.cd:active:not(.cd-off){transform:scale(.92)}
+.cd .cr{font-family:'JetBrains Mono',monospace;font-size:clamp(18px,2.8vw,30px);font-weight:800;line-height:1}
+.cd .cs{font-size:clamp(14px,2vw,22px);line-height:1}
+.cd-hero{border-color:#f0c040!important;background:rgba(240,192,64,0.05)!important;box-shadow:0 0 12px rgba(240,192,64,0.12)}
+.cd-board{border-color:#4488dd!important;background:rgba(68,136,221,0.05)!important;box-shadow:0 0 12px rgba(68,136,221,0.08)}
+.cd-off{opacity:.15;pointer-events:none}
+.cd-badge{position:absolute;top:2px;right:3px;font-size:8px;font-weight:900;width:15px;height:15px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#000}
+
+/* ── BOTTOM DETAIL PANEL ── */
+.detail-toggle{display:flex;align-items:center;justify-content:center;padding:4px;cursor:pointer;background:rgba(255,255,255,0.01);border-top:1px solid rgba(255,255,255,0.03);flex-shrink:0}
+.detail-toggle span{font-size:11px;color:rgba(255,255,255,0.6);font-weight:700;letter-spacing:.5px}
+.detail{flex-shrink:0;overflow:hidden;transition:max-height .25s ease;border-top:1px solid rgba(255,255,255,0.03)}
+.detail.open{max-height:400px;overflow-y:auto}
+.detail.closed{max-height:0}
+.detail-inner{padding:8px 12px;display:flex;gap:10px}
+.det-col{flex:1;min-width:0}
+.det-title{font-size:10px;font-weight:700;color:rgba(255,255,255,0.65);letter-spacing:.8px;text-transform:uppercase;margin-bottom:4px}
+.prob-row{display:flex;justify-content:space-between;align-items:center;padding:2px 4px;border-radius:4px;margin-bottom:1px}
+.prob-row.hi{background:rgba(240,192,64,0.04)}
+.prob-row .pname{font-size:12px;font-weight:600;color:rgba(255,255,255,0.75)}
+.prob-row .pname.hi{color:#f0c040;font-weight:800}
+.prob-row .pval{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700}
+.prob-bar{height:3px;border-radius:2px;background:rgba(255,255,255,0.06);margin-top:1px;overflow:hidden}
+.prob-fill{height:100%;border-radius:2px;transition:width .25s}
+.outs-box{display:flex;gap:6px;margin-bottom:6px}
+.outs-stat{flex:1;border-radius:8px;padding:6px;text-align:center}
+.outs-stat .ol{font-size:10px;font-weight:700;color:rgba(255,255,255,0.65);text-transform:uppercase}
+.outs-stat .ov{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:800;line-height:1.1}
+.outs-cards{display:flex;gap:2px;flex-wrap:wrap}
+.oc{width:28px;height:36px;border-radius:5px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.02);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.oc .ocr{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;line-height:1}
+.oc .ocs{font-size:10px;line-height:1}
+.oc.eq{border-color:rgba(48,200,90,0.2);background:rgba(48,200,90,0.03)}
+.outs-mode-btns{display:flex;gap:3px;margin-bottom:4px}
+.om-btn{padding:2px 8px;border-radius:8px;font-size:10px;font-weight:700;cursor:pointer;border:1.5px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.03);color:rgba(255,255,255,0.6);transition:.08s}
+.om-btn.on{border-color:#f0c040;background:rgba(240,192,64,0.06);color:#f0c040}
+.rule-box{background:rgba(255,255,255,0.02);border-radius:6px;padding:5px 8px;margin-top:4px;font-size:12px;color:rgba(255,255,255,0.7)}
+.rule-box .hlg{color:#30c860;font-weight:800}
+.draw-tbl{display:grid;grid-template-columns:1fr 58px 58px;gap:0;font-size:11px}
+.draw-tbl .dh{font-size:9px;font-weight:700;color:rgba(255,255,255,0.6);text-align:center;padding:2px 0}
+.draw-tbl .dn{color:rgba(255,255,255,0.75);padding:3px 6px;background:rgba(255,255,255,0.015);border-radius:3px 0 0 3px;margin-bottom:1px;font-weight:600}
+.draw-tbl .dv{font-family:'JetBrains Mono',monospace;font-weight:700;text-align:center;padding:3px 0;background:rgba(255,255,255,0.015);margin-bottom:1px}
+.draw-tbl .dv:last-child{border-radius:0 3px 3px 0}
+
+/* ── EMPTY STATE ── */
+.empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;gap:4px}
+.empty-state .icon{font-size:36px;opacity:.5}
+.empty-state .msg{font-size:14px;font-weight:700;color:rgba(255,255,255,0.55)}
+.empty-state .sub{font-size:11px;color:rgba(255,255,255,0.35)}
+
+/* ── Position Grid Toggle (desktop: always show, mobile: toggle) ── */
+.mob-pos-toggle{display:none}
+
+/* ── RESPONSIVE: TABLET (Galaxy Tab ~800px) ── */
+@media(max-width:900px){
+  .topbar{flex-wrap:wrap;gap:6px;padding:6px 10px;min-height:auto}
+  .cards-row{order:1;flex:1 1 100%;justify-content:center}
+  .logo{order:0}
+  .stage-badge{order:2}
+  .reset-btn{order:3}
+  .ctrl-group{order:4;flex:1 1 auto;justify-content:center}
+  .exploit-row{order:5}
+  .pos-toggle{order:6}
+  .vb-row{order:7;flex:1 1 100%;justify-content:center}
+  .hero-display{flex-direction:column;gap:8px;padding:8px 14px}
+  .wr-big .num{font-size:44px}
+  .action-bar .act{font-size:24px}
+  .detail-inner{flex-direction:column}
+  .card-slot{width:40px;height:52px}
+  .card-slot .rank{font-size:16px}
+  .card-slot .suit{font-size:12px}
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PHONE: ONE SCREEN, ZERO SCROLL
+   Structure: TopBar(~90px) → HeroInfo(~100px max, scroll) → Deck(fill)
+   ══════════════════════════════════════════════════════════════ */
+@media(max-width:520px){
+  html,body{height:100%;overflow:hidden;-webkit-overflow-scrolling:auto}
+  .app{height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+
+  /* ── ROW 1: TopBar — cards + controls (compact wrapping) ── */
+  .topbar{flex-wrap:wrap;gap:3px;padding:4px 5px;min-height:auto;border-bottom:1px solid rgba(255,255,255,0.04)}
+  .logo{font-size:11px;order:0}
+  .stage-badge{order:1;font-size:9px;padding:2px 6px;border-radius:10px}
+  .reset-btn{order:2;height:24px;font-size:9px;padding:0 8px;margin-left:auto;border-radius:5px;border-width:1.5px}
+
+  .cards-row{order:3;flex:1 1 100%;gap:2px;justify-content:center}
+  .card-slot{width:34px;height:40px;border-radius:5px;border-width:1.5px}
+  .card-slot .rank{font-size:14px}
+  .card-slot .suit{font-size:10px}
+  .card-slot .slot-lbl{font-size:6px}
+  .card-slot .x-btn{width:13px;height:13px;font-size:7px;opacity:1;top:-2px;right:-2px}
+  .sep{height:22px;margin:0 1px}
+
+  .ctrl-group{order:4;flex:1 1 100%;justify-content:center;gap:2px;margin-left:0}
+  .ctrl-group label{font-size:8px;margin-right:1px}
+  .opp-btn{width:24px;height:24px;font-size:10px;border-radius:5px}
+
+  .exploit-row{order:5;gap:2px}
+  .ex-btn{padding:2px 7px;font-size:9px;border-radius:5px}
+  .pos-toggle{order:6;gap:2px}
+  .pt-btn{padding:2px 8px;font-size:9px;border-radius:5px}
+  .vb-row{order:7;gap:2px}
+  .vb-lbl{font-size:8px;margin-right:1px}
+  .vb-btn{padding:2px 6px;font-size:9px;border-radius:5px}
+
+  /* ── ROW 2: HeroDisplay — FIXED HEIGHT, internal scroll ── */
+  .hero-display{
+    padding:4px 8px;gap:2px;flex-shrink:0;
+    max-height:110px;overflow-y:auto;overflow-x:hidden;
+    border-bottom:1px solid rgba(255,255,255,0.04);
+    -webkit-overflow-scrolling:touch;
+  }
+  .empty-state{padding:8px;gap:2px}
+  .empty-state .icon{font-size:20px}
+  .empty-state .msg{font-size:11px}
+  .empty-state .sub{font-size:9px}
+
+  /* Win rate: ultra compact inline */
+  .hero-sec-wr{gap:0}
+  .hand-name{font-size:10px;margin-bottom:0;line-height:1.2}
+  .tier-badge{font-size:7px;padding:1px 4px;margin-left:3px}
+  .wr-big{gap:3px}
+  .wr-big .num{font-size:26px;letter-spacing:-1px}
+  .wr-big .pct{font-size:13px}
+  .wr-big .lbl{font-size:9px}
+  .wr-sub{gap:6px;margin-top:0}
+  .wr-sub .item .l{font-size:8px}
+  .wr-sub .item .v{font-size:11px}
+  .wr-meta{font-size:7px;margin-top:0}
+
+  /* Action bar: compact single line */
+  .hero-sec-act{min-width:0;gap:0!important}
+  .action-bar{padding:3px 8px;border-radius:5px;gap:8px}
+  .action-bar .act{font-size:16px}
+  .action-bar .bb{font-size:11px}
+  .action-bar .reason{font-size:8px;margin-top:0}
+
+  /* Freq / Turn / Exploit: tiny */
+  .freq-bar{margin-top:1px;gap:3px}
+  .freq-lbl{font-size:7px}
+  .freq-track{height:3px}
+  .turn-plan{font-size:8px;padding:2px 5px;margin-top:1px}
+  .turn-plan .tp-lbl{font-size:7px}
+  .exploit-hint{font-size:7px;margin-top:0!important}
+  .bluff-info{font-size:7px;padding:2px 5px;margin-top:1px}
+
+  /* Position grid: HIDDEN by default, toggle to show */
+  .mob-pos-toggle{
+    display:flex!important;align-items:center;justify-content:center;
+    padding:1px 0;cursor:pointer;flex-shrink:0;
+  }
+  .mob-pos-toggle span{font-size:9px;color:rgba(255,255,255,0.45);font-weight:700}
+  .hero-sec-pos{display:none!important}
+  .hero-sec-pos.mob-show{display:flex!important;flex-direction:column;gap:1px}
+  .pos-grid{gap:2px}
+  .pos-cell{padding:2px 4px;min-width:0;border-radius:4px}
+  .pos-cell .pn{font-size:7px}
+  .pos-cell .pa{font-size:9px}
+  .pos-cell .pb{font-size:7px}
+
+  /* ── ROW 3: Card Deck — FILLS ALL REMAINING SPACE ── */
+  .deck-area{flex:1;min-height:0;padding:2px 3px;gap:1px;overflow:hidden}
+  .deck-label{font-size:7px;margin-bottom:0;line-height:1.2}
+  .deck{gap:1px;flex:1;min-height:0}
+  .cd{border-radius:4px;border-width:1px}
+  .cd .cr{font-size:clamp(11px,3vw,15px)}
+  .cd .cs{font-size:clamp(8px,2vw,12px)}
+  .cd:hover:not(.cd-off){transform:none}
+  .cd:active:not(.cd-off){transform:scale(.9)}
+  .cd-badge{width:10px;height:10px;font-size:6px;top:0;right:0}
+
+  /* ── Detail panel: collapsed, very compact when open ── */
+  .detail-toggle{padding:2px}
+  .detail-toggle span{font-size:8px}
+  .detail.open{max-height:180px}
+  .detail-inner{flex-direction:column;padding:4px 6px;gap:3px}
+  .det-title{font-size:8px;margin-bottom:2px}
+  .prob-row{padding:1px 3px}
+  .prob-row .pname{font-size:9px}
+  .prob-row .pval{font-size:10px}
+  .prob-bar{height:2px}
+  .outs-stat{padding:3px}
+  .outs-stat .ol{font-size:7px}
+  .outs-stat .ov{font-size:13px}
+  .oc{width:20px;height:26px;border-radius:3px}
+  .oc .ocr{font-size:8px}
+  .oc .ocs{font-size:7px}
+  .draw-tbl{font-size:8px}
+  .draw-tbl .dh{font-size:7px}
+  .rule-box{font-size:9px;padding:3px 6px}
+}
+
+/* ── LANDSCAPE PHONE ── */
+@media(max-height:500px) and (max-width:900px){
+  .topbar{padding:3px 5px;min-height:auto;gap:2px}
+  .card-slot{width:28px;height:34px}
+  .card-slot .rank{font-size:12px}
+  .card-slot .suit{font-size:8px}
+  .hero-display{padding:2px 6px;gap:1px;max-height:80px}
+  .wr-big .num{font-size:20px}
+  .action-bar .act{font-size:14px}
+  .deck-area{padding:1px 2px}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script>
+"use strict";
+const e=React.createElement,{useState,useMemo,useCallback}=React;
+const S=["♠","♥","♦","♣"],SC={"♠":"c-s","♥":"c-h","♦":"c-d","♣":"c-c"};
+const R=["A","K","Q","J","T","9","8","7","6","5","4","3","2"];
+const RV={A:14,K:13,Q:12,J:11,T:10,"9":9,"8":8,"7":7,"6":6,"5":5,"4":4,"3":3,"2":2};
+const HR=["Royal Flush","Straight Flush","Four of a Kind","Full House","Flush","Straight","Three of a Kind","Two Pair","One Pair","High Card"];
+const HK={"Royal Flush":"로얄 플러시","Straight Flush":"스트플러시","Four of a Kind":"포카드","Full House":"풀하우스","Flush":"플러시","Straight":"스트레이트","Three of a Kind":"트리플","Two Pair":"투페어","One Pair":"원페어","High Card":"하이카드"};
+
+// ══════════ ENGINE (v6 optimized — unchanged) ══════════
+const IDX7=[[0,1,2,3,4],[0,1,2,3,5],[0,1,2,3,6],[0,1,2,4,5],[0,1,2,4,6],[0,1,2,5,6],[0,1,3,4,5],[0,1,3,4,6],[0,1,3,5,6],[0,1,4,5,6],[0,2,3,4,5],[0,2,3,4,6],[0,2,3,5,6],[0,2,4,5,6],[0,3,4,5,6],[1,2,3,4,5],[1,2,3,4,6],[1,2,3,5,6],[1,2,4,5,6],[1,3,4,5,6],[2,3,4,5,6]];
+const IDX6=[[0,1,2,3,4],[0,1,2,3,5],[0,1,2,4,5],[0,1,3,4,5],[0,2,3,4,5],[1,2,3,4,5]];
+const _h5=[null,null,null,null,null];
+const B=15,B5=B*B*B*B*B,B4=B*B*B*B,B3=B*B*B,B2=B*B;
+
+function ev5(c){const r0=RV[c[0].rank],r1=RV[c[1].rank],r2=RV[c[2].rank],r3=RV[c[3].rank],r4=RV[c[4].rank];const rk=[r0,r1,r2,r3,r4];rk.sort((a,b2)=>b2-a);const s0=c[0].suit;const fl=c[1].suit===s0&&c[2].suit===s0&&c[3].suit===s0&&c[4].suit===s0;let st=false,sh=0;if(rk[0]-rk[4]===4&&new Set(rk).size===5){st=true;sh=rk[0]}if(rk[0]===14&&rk[1]===5&&rk[2]===4&&rk[3]===3&&rk[4]===2){st=true;sh=5}const cn=new Int8Array(15);cn[rk[0]]++;cn[rk[1]]++;cn[rk[2]]++;cn[rk[3]]++;cn[rk[4]]++;let q4=0,t3=0,p1=0,p2=0;const kick=[];for(let i=14;i>=2;i--){const c2=cn[i];if(c2===4)q4=i;else if(c2===3)t3=i;else if(c2===2){if(!p1)p1=i;else p2=i}else if(c2===1)kick.push(i)}if(fl&&st)return sh===14?{n:"Royal Flush",v:9*B5+14*B4}:{n:"Straight Flush",v:8*B5+sh*B4};if(q4)return{n:"Four of a Kind",v:7*B5+q4*B4+kick[0]*B3};if(t3&&p1)return{n:"Full House",v:6*B5+t3*B4+p1*B3};if(fl)return{n:"Flush",v:5*B5+rk[0]*B4+rk[1]*B3+rk[2]*B2+rk[3]*B+rk[4]};if(st)return{n:"Straight",v:4*B5+sh*B4};if(t3)return{n:"Three of a Kind",v:3*B5+t3*B4+kick[0]*B3+kick[1]*B2};if(p1&&p2)return{n:"Two Pair",v:2*B5+p1*B4+p2*B3+kick[0]*B2};if(p1)return{n:"One Pair",v:1*B5+p1*B4+kick[0]*B3+kick[1]*B2+kick[2]*B};return{n:"High Card",v:rk[0]*B4+rk[1]*B3+rk[2]*B2+rk[3]*B+rk[4]}}
+
+function getH(cards){const n=cards.length;if(n<5)return null;if(n===5)return ev5(cards);const idx=n===7?IDX7:IDX6;let best=null;for(let i=0,len=idx.length;i<len;i++){const ci=idx[i];_h5[0]=cards[ci[0]];_h5[1]=cards[ci[1]];_h5[2]=cards[ci[2]];_h5[3]=cards[ci[3]];_h5[4]=cards[ci[4]];const r=ev5(_h5);if(!best||r.v>best.v)best=r}return best}
+
+function mkDeck(ex){const s=new Set();for(let i=0;i<ex.length;i++)s.add(ex[i].rank+ex[i].suit);const d=[];for(let i=0;i<4;i++)for(let j=0;j<13;j++)if(!s.has(R[j]+S[i]))d.push({rank:R[j],suit:S[i]});return d}
+
+function sampleIdx(n,k,buf){for(let i=0;i<n;i++)buf[i]=i;for(let i=0;i<k&&i<n;i++){const j=i+((Math.random()*(n-i))|0);const t=buf[i];buf[i]=buf[j];buf[j]=t}}
+const _idxBuf=new Int8Array(52);
+
+const SIM_N=5000;
+function sim(h,b,numOpp){if(h.length<2)return null;const dk=mkDeck(h.concat(b));const dkLen=dk.length;const nd=5-b.length;const need=nd+numOpp*2;if(dkLen<need)return null;let wins=0,ties=0;const bLen=b.length;const myAll=new Array(h.length+5);myAll[0]=h[0];myAll[1]=h[1];for(let j=0;j<bLen;j++)myAll[2+j]=b[j];const fb=new Array(5);for(let j=0;j<bLen;j++)fb[j]=b[j];const opAll=new Array(7);for(let i=0;i<SIM_N;i++){sampleIdx(dkLen,need,_idxBuf);for(let j=0;j<nd;j++){const card=dk[_idxBuf[j]];myAll[2+bLen+j]=card;fb[bLen+j]=card}const my=getH(myAll);if(!my)continue;const myV=my.v;let bestOppV=0;for(let o=0;o<numOpp;o++){const oi=nd+o*2;opAll[0]=dk[_idxBuf[oi]];opAll[1]=dk[_idxBuf[oi+1]];opAll[2]=fb[0];opAll[3]=fb[1];opAll[4]=fb[2];opAll[5]=fb[3];opAll[6]=fb[4];const ov=getH(opAll);if(ov&&ov.v>bestOppV)bestOppV=ov.v}if(myV>bestOppV)wins++;else if(myV===bestOppV)ties++}const p=wins/SIM_N;const margin=1.96*Math.sqrt(p*(1-p)/SIM_N)*100;return{win:(p*100).toFixed(1),tie:(ties/SIM_N*100).toFixed(1),lose:((SIM_N-wins-ties)/SIM_N*100).toFixed(1),n:SIM_N,err:margin.toFixed(1)}}
+
+function calcP(h,b){if(h.length<2)return null;const dk=mkDeck(h.concat(b)),nd=5-b.length;const cn={};HR.forEach(x=>{cn[x]=0});let total=0,exact=false;if(nd===0){const x=getH(h.concat(b));const p2={};HR.forEach(x=>{p2[x]="0.0"});if(x)p2[x.n]="100.0";return{p:p2,exact:true,total:1}}if(nd===1){exact=true;const base=h.concat(b),all=base.concat([null]);for(let i=0;i<dk.length;i++){all[base.length]=dk[i];const x=getH(all);if(x){cn[x.n]++;total++}}}else if(nd===2){exact=true;const base=h.concat(b),all=base.concat([null,null]);for(let i=0;i<dk.length;i++){all[base.length]=dk[i];for(let j=i+1;j<dk.length;j++){all[base.length+1]=dk[j];const x=getH(all);if(x){cn[x.n]++;total++}}}}else{const iter=3000;const base=h.concat(b),all=base.concat(new Array(nd)),dkLen=dk.length;for(let i=0;i<iter;i++){sampleIdx(dkLen,nd,_idxBuf);for(let j=0;j<nd;j++)all[base.length+j]=dk[_idxBuf[j]];const x=getH(all);if(x){cn[x.n]++;total++}}}const p2={};HR.forEach(x=>{p2[x]=total>0?(cn[x]/total*100).toFixed(1):"0.0"});return{p:p2,exact,total}}
+
+function calcOuts(h,b){const all=h.concat(b),dk=mkDeck(all);if(all.length<5)return{outs:[],tot:dk.length};const cur=getH(all);if(!cur)return{outs:[],tot:dk.length};const outs=[];const test=all.concat([null]);for(let i=0;i<dk.length;i++){test[all.length]=dk[i];const x=getH(test);if(x&&x.v>cur.v)outs.push({card:dk[i],hand:x.n})}return{outs,tot:dk.length,cur}}
+
+function calcEqOuts(h,b,numOpp,baseWin,handOuts){const dk=mkDeck(h.concat(b));const dkLen=dk.length;if(dkLen<3)return[];const baseEq=baseWin;const handOutKeys=new Set();if(handOuts)handOuts.forEach(o=>handOutKeys.add(o.card.rank+o.card.suit));const candidates=[];for(let i=0;i<dkLen;i++){const c=dk[i];candidates.push({card:c,idx:i,priority:handOutKeys.has(c.rank+c.suit)?0:1})}candidates.sort((a,b2)=>a.priority-b2.priority);const eqOuts=[];const samplesPerCard=numOpp<=2?200:100;const bLen=b.length;const myAll=new Array(h.length+5);myAll[0]=h[0];myAll[1]=h[1];const fb=new Array(5);const opAll=new Array(7);const remIdx=new Int8Array(52);for(let ci=0;ci<candidates.length;ci++){const{card,idx:skipIdx}=candidates[ci];const rem=[];for(let j=0;j<dkLen;j++)if(j!==skipIdx)rem.push(dk[j]);const remLen=rem.length;const newBLen=bLen+1;const nd2=5-newBLen;const need2=nd2+numOpp*2;if(remLen<need2)continue;for(let j=0;j<bLen;j++){fb[j]=b[j];myAll[2+j]=b[j]}fb[bLen]=card;myAll[2+bLen]=card;let w=0;for(let s=0;s<samplesPerCard;s++){sampleIdx(remLen,need2,remIdx);for(let j=0;j<nd2;j++){const c2=rem[remIdx[j]];fb[newBLen+j]=c2;myAll[2+newBLen+j]=c2}const my=getH(myAll);if(!my)continue;let bestOpp=0;for(let o=0;o<numOpp;o++){const oi2=nd2+o*2;opAll[0]=rem[remIdx[oi2]];opAll[1]=rem[remIdx[oi2+1]];opAll[2]=fb[0];opAll[3]=fb[1];opAll[4]=fb[2];opAll[5]=fb[3];opAll[6]=fb[4];const ov=getH(opAll);if(ov&&ov.v>bestOpp)bestOpp=ov.v}if(my.v>bestOpp)w++}const eq=(w/samplesPerCard*100);if(eq>baseEq+3)eqOuts.push({card,eq:eq.toFixed(1)})}return eqOuts}
+
+// ══════════ APP ══════════
+function App(){
+  const[hole,setHole]=useState([]);
+  const[board,setBoard]=useState([]);
+  const[numOpp,setNumOpp]=useState(1);
+  const[outsMode,setOutsMode]=useState("hand");
+  const[showDetail,setShowDetail]=useState(false);
+
+  const sel=useMemo(()=>{const m={};hole.forEach(c=>{m[c.rank+c.suit]="h"});board.forEach(c=>{m[c.rank+c.suit]="b"});return m},[hole,board]);
+
+  const click=useCallback((rank,suit)=>{
+    const k=rank+suit,card={rank,suit};
+    if(sel[k]){setHole(p=>p.filter(c=>c.rank+c.suit!==k));setBoard(p=>p.filter(c=>c.rank+c.suit!==k));return}
+    if(hole.length<2)setHole(p=>p.concat([card]));
+    else if(board.length<5)setBoard(p=>p.concat([card]));
+  },[sel,hole,board]);
+
+  const rmH=i=>setHole(p=>p.filter((_,j)=>j!==i));
+  const rmB=i=>setBoard(p=>p.filter((_,j)=>j!==i));
+  const reset=()=>{setHole([]);setBoard([]);setOutsMode("hand");setVillBet(null)};
+  const [exploitMode,setExploitMode]=useState("gto"); // gto, fold_heavy, call_heavy
+  const [heroPos,setHeroPos]=useState("IP"); // IP or OOP
+  const [villBet,setVillBet]=useState(null); // null=auto, 0.33/0.5/0.66/1.0/1.5
+  const [mobPosShow,setMobPosShow]=useState(false); // mobile: toggle position grid
+
+  const stage=board.length===0?"Preflop":board.length===3?"Flop":board.length===4?"Turn":"River";
+  const stCol={Preflop:"#f0c040",Flop:"#30c860",Turn:"#4a9eff",River:"#b09dff"}[stage];
+  const hand=useMemo(()=>getH(hole.concat(board)),[hole,board]);
+  const wr=useMemo(()=>sim(hole,board,numOpp),[hole,board,numOpp]);
+  const probsData=useMemo(()=>calcP(hole,board),[hole,board]);
+  const probs=probsData?probsData.p:null;
+  const probsExact=probsData?probsData.exact:false;
+  const oi=useMemo(()=>(hole.length<2||board.length<3)?null:calcOuts(hole,board),[hole,board]);
+  const og=useMemo(()=>{if(!oi||!oi.outs.length)return{};const g={};oi.outs.forEach(o=>{if(!g[o.hand])g[o.hand]=[];g[o.hand].push(o.card)});return g},[oi]);
+  const op=useMemo(()=>{if(!oi||!oi.outs.length)return null;const o=oi.outs.length,r=oi.tot,nd=5-board.length;if(nd===2){const m=((r-o)/r)*((r-o-1)/(r-1));return((1-m)*100).toFixed(1)}if(nd===1)return((o/r)*100).toFixed(1);return null},[oi,board]);
+  const eqOuts=useMemo(()=>{if(outsMode!=="equity"||hole.length<2||board.length<3||!wr)return[];return calcEqOuts(hole,board,numOpp,parseFloat(wr.win),oi?oi.outs:[])},[outsMode,hole,board,numOpp,wr,oi]);
+
+  // ══════════ GTO 6-MAX PREFLOP RANGES (Solver-based) ══════════
+  // Position tiers: 1=UTG(~15%), 2=MP(~19%), 3=CO(~27%), 4=BTN(~48%), 5=SB(~36%), 6=Fold
+  const pf=useMemo(()=>{
+    if(hole.length<2)return null;const c1=hole[0],c2=hole[1],s=c1.suit===c2.suit;
+    const r1=RV[c1.rank],r2=RV[c2.rank],hi=Math.max(r1,r2),lo=Math.min(r1,r2),pair=r1===r2;
+    let pt;
+    if(pair){pt=hi>=6?1:hi>=4?2:3}
+    else if(s){
+      if(hi===14)pt=lo>=9||lo===5?1:2;
+      else if(hi===13)pt=lo>=10?1:lo>=9?2:lo>=7?3:lo>=2?4:6;
+      else if(hi===12)pt=lo>=10?1:lo>=9?2:lo>=8?3:lo>=2?4:6;
+      else if(hi===11)pt=lo===10?1:lo===9?2:lo===8?3:lo>=6?4:5;
+      else if(hi===10)pt=lo===9?1:lo===8?3:lo>=6?4:5;
+      else if(hi===9)pt=lo===8?1:lo===7?3:lo===6?4:5;
+      else if(hi===8)pt=lo===7?3:lo>=5?4:5;
+      else if(hi===7)pt=lo>=5?3:lo===4?4:5;
+      else if(hi===6)pt=lo===5?3:lo>=3?4:5;
+      else if(hi===5)pt=lo===4?3:lo===3?4:5;
+      else if(hi===4)pt=lo===3?4:5;
+      else if(hi===3)pt=lo===2?4:6;
+      else pt=6;
+    } else {
+      if(hi===14)pt=lo>=12?1:lo>=11?2:lo>=10?3:lo>=2?4:6;
+      else if(hi===13)pt=lo===12?2:lo>=11?3:lo>=7?4:6;
+      else if(hi===12)pt=lo>=8?4:6;
+      else if(hi===11)pt=lo>=8?4:6;
+      else if(hi===10)pt=lo>=8?4:6;
+      else if(hi===9)pt=lo>=7?4:6;
+      else if(hi===8)pt=lo===7?4:6;
+      else if(hi===7)pt=lo===6?4:6;
+      else pt=6;
+    }
+    const tierMap={1:"Premium",2:"Strong",3:"Solid",4:"Playable",5:"Marginal",6:"Fold"};
+    const posMap={1:"UTG+",2:"MP+",3:"CO+",4:"BTN",5:"SB",6:"—"};
+    const tier=tierMap[pt];
+    const nm=pair?c1.rank+c2.rank:(r1>r2?c1.rank+c2.rank:c2.rank+c1.rank)+(s?"s":"o");
+    return{tier,nm,pt,pos:posMap[pt]};
+  },[hole]);
+  const tc={Premium:"#f0c040",Strong:"#30c860",Solid:"#4a9eff",Playable:"#b09dff",Marginal:"#888",Fold:"#666"};
+
+  // ══════════ BOARD TEXTURE v3 (Position-aware Range Advantage) ══════════
+  const boardTex=useMemo(()=>{
+    if(board.length<3)return null;
+    const suits=board.map(c=>c.suit),ranks=board.map(c=>RV[c.rank]).sort((a,b)=>b-a);
+    const sc={};suits.forEach(s=>{sc[s]=(sc[s]||0)+1});const ms=Math.max(...Object.values(sc));
+    const monoSuit=ms>=3?Object.keys(sc).find(s=>sc[s]===ms):null;
+    const uniq=[...new Set(ranks)].sort((a,b)=>b-a);
+    let conn=0;for(let i=0;i<uniq.length-1;i++)if(uniq[i]-uniq[i+1]<=2)conn++;
+    if(uniq.includes(14)&&uniq.some(r=>r<=5))conn++;
+    const paired=uniq.length<ranks.length;
+    const hiCnt=ranks.filter(r=>r>=10).length;
+    const hasAce=ranks.includes(14);
+    let type;
+    if(ms>=3)type="mono";else if(conn>=2&&!paired)type="wet";else if(paired)type="paired";else type="dry";
+    let monoType=null;
+    if(type==="mono"){monoType=hasAce?"A-high":ranks[0]>=10?"high":"mid"}
+    let heroFlushCards=0;
+    if(monoSuit&&hole.length>=2){hole.forEach(c=>{if(c.suit===monoSuit)heroFlushCards++})}
+    // V3: Position-aware Range Advantage
+    // Base advantage from board texture (raiser vs caller)
+    let baseAdv=0; // positive = hero(raiser), negative = villain(caller)
+    if(type==="dry"&&hiCnt>=2)baseAdv=25; // Dry high = strong raiser advantage
+    else if(type==="dry"&&ranks[0]<=9)baseAdv=-15; // Low dry = BB connects
+    else if(type==="wet"&&ranks[0]<=10)baseAdv=-20; // Low connected = BB advantage
+    else if(type==="wet"&&hasAce)baseAdv=15; // A-high wet = raiser
+    else if(type==="mono"&&heroFlushCards>=1)baseAdv=10;
+    else if(type==="mono"&&heroFlushCards===0)baseAdv=-25;
+    else if(type==="paired")baseAdv=15;
+    // Position modifier: IP gets +12, OOP gets -12
+    const posAdj=heroPos==="IP"?12:-12;
+    const finalAdv=baseAdv+posAdj;
+    const rangeAdv=finalAdv>=10?"hero":finalAdv<=-10?"villain":"neutral";
+    const flush2=ms===2&&!type.startsWith("mono");
+    return{type,mono:ms>=3,paired,conn,hiCnt,flush2,flush3:ms>=3,monoType,monoSuit,heroFlushCards,rangeAdv,hasAce,posAdj:heroPos,advScore:finalAdv};
+  },[board,hole,heroPos]);
+
+  // ══════════ BLOCKER ANALYSIS v3 ══════════
+  const blockerInfo=useMemo(()=>{
+    if(hole.length<2||board.length<3)return null;
+    const h=hole,b=board;
+    const bRanks=b.map(c=>RV[c.rank]),bSuits=b.map(c=>c.suit);
+    const hRanks=h.map(c=>RV[c.rank]),hSuits=h.map(c=>c.suit);
+    const sc={};bSuits.forEach(s=>{sc[s]=(sc[s]||0)+1});
+    const flushSuit=Object.keys(sc).find(s=>sc[s]>=2);
+    // Nut blockers: do we block opponent's best possible hands?
+    let nutBlock=0,flushBlock=0,strBlock=0;
+    // Flush blockers: hero holds A/K of flush-draw suit
+    if(flushSuit){h.forEach(c=>{if(c.suit===flushSuit){if(RV[c.rank]>=13)nutBlock+=2;else if(RV[c.rank]>=10)nutBlock+=1;flushBlock++}})}
+    // Straight blockers: hero holds cards that complete straights
+    const bSorted=[...new Set(bRanks)].sort((a,c)=>a-c);
+    h.forEach(c=>{const r=RV[c.rank];for(let lo=Math.max(2,r-4);lo<=Math.min(10,r);lo++){let cnt=0;for(let k=lo;k<=lo+4;k++){const rr=k===1?14:k;if(bRanks.includes(rr)||hRanks.includes(rr))cnt++}if(cnt>=4)strBlock++}});
+    // Showdown value: does hero's hand have any pair+ with board?
+    const handN=hand?hand.n:null;
+    const hasShowdown=handN&&handN!=="High Card";
+    // Bluff quality: no showdown + has blockers = best bluff combo
+    let bluffQuality="poor";
+    if(!hasShowdown&&nutBlock>=2)bluffQuality="excellent";
+    else if(!hasShowdown&&(nutBlock>=1||flushBlock>=1))bluffQuality="good";
+    else if(!hasShowdown&&strBlock>=1)bluffQuality="decent";
+    else if(!hasShowdown)bluffQuality="marginal";
+    else if(hasShowdown&&handN==="One Pair")bluffQuality="showdown"; // has showdown, don't bluff
+    else bluffQuality="value"; // strong hand, not a bluff candidate
+    return{nutBlock,flushBlock,strBlock,bluffQuality,hasShowdown};
+  },[hole,board,hand]);
+
+  // ══════════ GTO BETTING RECOMMENDATION v3 ══════════
+  // V3: Position-aware + River MDF + Blocker-based bluff selection
+  const betRec=useMemo(()=>{
+    if(hole.length<2||!wr)return null;
+    const w=parseFloat(wr.win),stg=board.length===0?"preflop":"post";
+    const pt=pf?pf.pt:6;
+    const hasOuts=oi&&oi.outs.length>0,outsN=oi?oi.outs.length:0;
+    const handN=hand?hand.n:null;
+    const isNuts=handN&&["Royal Flush","Straight Flush","Four of a Kind"].indexOf(handN)>=0;
+    const isMonster=handN&&["Full House"].indexOf(handN)>=0;
+    const isStrong=handN&&["Flush","Straight"].indexOf(handN)>=0;
+    const isMedium=handN&&["Three of a Kind","Two Pair"].indexOf(handN)>=0;
+    const isOnePair=handN&&handN==="One Pair";
+    const isHighCard=handN&&handN==="High Card";
+    const mw=numOpp>=3,tight=numOpp>=5;
+    const street=board.length===3?"flop":board.length===4?"turn":"river";
+    const ex=exploitMode;
+    const isIP=heroPos==="IP";
+    const bl=blockerInfo;
+
+    // Exploit adjustments
+    const exBluff=ex==="fold_heavy"?15:0;
+    const exValue=ex==="call_heavy"?10:0;
+    const exFold=ex==="call_heavy"?15:0;
+
+    // ── PREFLOP: GTO RFI + exploit ──
+    if(stg==="preflop"){
+      const mkPos=(utg,mp,co,btn)=>[
+        {p:"UTG",a:utg[0],bb:utg[1],c:utg[2]},
+        {p:"MP",a:mp[0],bb:mp[1],c:mp[2]},
+        {p:"CO",a:co[0],bb:co[1],c:co[2]},
+        {p:"BTN",a:btn[0],bb:btn[1],c:btn[2]}
+      ];
+      const pfExploit=ex==="fold_heavy"?"상대 폴드 과다 → 스틸 빈도↑":ex==="call_heavy"?"상대 콜 과다 → 밸류 핸드만 오픈":"GTO 밸런스 유지";
+      if(pt===1)return{act:"RAISE",bb:"2.5 BB",cls:"act-raise",reason:"GTO RFI — 모든 포지션 ("+pf.nm+")",positions:mkPos(["레이즈","2.5BB","st-raise"],["레이즈","2.5BB","st-raise"],["레이즈","2.5BB","st-raise"],["레이즈","2.5BB","st-raise"]),freq:{bet:100,check:0},turnPlan:null,exploit:pfExploit,bluffInfo:null};
+      if(pt===2)return{act:"RAISE",bb:"2.5 BB",cls:"act-raise",reason:"GTO RFI — MP+ ("+pf.nm+")",positions:mkPos(["폴드","—","st-fold"],["레이즈","2.5BB","st-raise"],["레이즈","2.5BB","st-raise"],["레이즈","2.5BB","st-raise"]),freq:{bet:100,check:0},turnPlan:null,exploit:pfExploit,bluffInfo:null};
+      if(pt===3)return{act:"RAISE",bb:"2.5 BB",cls:"act-raise",reason:"GTO RFI — CO+ ("+pf.nm+")",positions:mkPos(["폴드","—","st-fold"],["폴드","—","st-fold"],["레이즈","2.5BB","st-raise"],["레이즈","2.5BB","st-raise"]),freq:{bet:100,check:0},turnPlan:null,exploit:pfExploit,bluffInfo:null};
+      if(pt===4){const canSteal=ex==="fold_heavy";return{act:mw&&!canSteal?"FOLD":"RAISE",bb:mw&&!canSteal?"":"2.5 BB",cls:mw&&!canSteal?"act-fold":"act-raise",reason:canSteal?"익스플로잇 스틸 — BTN ("+pf.nm+")":mw?"멀티웨이 폴드":"GTO RFI — BTN ("+pf.nm+")",positions:mkPos(["폴드","—","st-fold"],["폴드","—","st-fold"],canSteal?["레이즈","2.5BB","st-raise"]:["폴드","—","st-fold"],["레이즈","2.5BB","st-raise"]),freq:{bet:mw&&!canSteal?0:100,check:mw&&!canSteal?100:0},turnPlan:null,exploit:pfExploit,bluffInfo:null}}
+      if(pt===5){const canSteal=ex==="fold_heavy";return{act:canSteal?"RAISE":"FOLD",bb:canSteal?"3 BB":"",cls:canSteal?"act-raise":"act-fold",reason:canSteal?"익스플로잇 SB 스틸 ("+pf.nm+")":"SB 한정 폴드 ("+pf.nm+")",positions:mkPos(["폴드","—","st-fold"],["폴드","—","st-fold"],["폴드","—","st-fold"],canSteal?["레이즈","3BB","st-raise"]:["폴드","—","st-fold"]),freq:{bet:canSteal?100:0,check:canSteal?0:100},turnPlan:null,exploit:pfExploit,bluffInfo:null}}
+      return{act:"FOLD",bb:"",cls:"act-fold",reason:"GTO 레인지 밖 — 폴드 ("+pf.nm+")",positions:mkPos(["폴드","—","st-fold"],["폴드","—","st-fold"],["폴드","—","st-fold"],["폴드","—","st-fold"]),freq:{bet:0,check:100},turnPlan:null,exploit:pfExploit,bluffInfo:null};
+    }
+
+    // ── POSTFLOP v3 ──
+    const tex=boardTex?boardTex.type:"dry";
+    const ra=boardTex?boardTex.rangeAdv:"neutral";
+    const isDry=tex==="dry"||tex==="paired";
+    const isWet=tex==="wet";
+    const isMono=tex==="mono";
+    const heroHasFlush=boardTex?boardTex.heroFlushCards>=1:false;
+    const monoT=boardTex?boardTex.monoType:null;
+    const posLbl=isIP?"IP":"OOP";
+
+    // Dynamic c-bet sizing (position-aware)
+    let cbetSz,cbetLbl;
+    if(isDry&&ra==="hero"){cbetSz="0.33x팟";cbetLbl="드라이+"+posLbl+"우위"}
+    else if(isDry&&ra!=="hero"){cbetSz=isIP?"0.25x팟":"체크";cbetLbl="드라이+"+posLbl+(ra==="villain"?"불리":"중립")}
+    else if(isMono&&heroHasFlush){cbetSz="0.66x팟";cbetLbl="모노+플러시보유+"+posLbl}
+    else if(isMono&&monoT==="A-high"){cbetSz="0.33x팟";cbetLbl="A-high모노+"+posLbl+"(체크↑)"}
+    else if(isMono){cbetSz=isIP?"0.33x팟":"체크";cbetLbl="모노+플러시없음+"+posLbl}
+    else if(isWet&&ra==="hero"){cbetSz="0.66x팟";cbetLbl="웻+"+posLbl+"우위"}
+    else if(isWet){cbetSz=isIP?"0.5x팟":"0.33x팟";cbetLbl="웻+"+posLbl}
+    else{cbetSz="0.33x팟";cbetLbl="페어+"+posLbl}
+
+    // Betting frequency (position-adjusted)
+    let baseBetFreq;
+    if(isDry&&ra==="hero")baseBetFreq=isIP?75:55;
+    else if(isDry&&ra==="villain")baseBetFreq=isIP?40:25;
+    else if(isDry)baseBetFreq=isIP?60:40;
+    else if(isWet&&ra==="hero")baseBetFreq=isIP?55:35;
+    else if(isWet)baseBetFreq=isIP?35:20;
+    else if(isMono&&heroHasFlush)baseBetFreq=isIP?50:30;
+    else if(isMono)baseBetFreq=isIP?25:12;
+    else baseBetFreq=isIP?50:35;
+    if(mw)baseBetFreq=Math.max(10,baseBetFreq-25);
+    if(street==="turn")baseBetFreq=Math.max(8,baseBetFreq-10);
+    if(street==="river")baseBetFreq=Math.max(5,baseBetFreq-15);
+    baseBetFreq=Math.min(95,Math.max(5,baseBetFreq+exBluff-exFold));
+
+    // ── V3→V4: RIVER MDF based on VILLAIN bet size ──
+    const isRiver=street==="river";
+    // MDF = Pot / (Pot + Bet) — must use OPPONENT's bet size for call/fold
+    // mdfCalc: numeric bet ratio → {mdf, needEq, label}
+    const mdfCalc=(ratio)=>{
+      const mdfV=Math.round(100/(1+ratio)); // Pot/(Pot+Bet) as %
+      const needEq=Math.round(ratio/(1+2*ratio)*100); // Bet/(Pot+2*Bet) = needed equity to call
+      return{mdf:mdfV,needEq,label:Math.round(ratio*100)+"%팟"};
+    };
+    // For hero's betting: use cbetSz
+    const heroBetRatio=cbetSz.includes("0.25")?0.25:cbetSz.includes("0.33")?0.33:cbetSz.includes("0.5")?0.5:cbetSz.includes("0.66")?0.66:cbetSz.includes("0.75")?0.75:1.0;
+    const heroMdf=mdfCalc(heroBetRatio);
+    // For call/fold decisions: use villain's bet size (user input or default)
+    const vb=villBet||0.66; // default assume 66% pot if not set
+    const villMdf=mdfCalc(vb);
+    const mdf=villMdf.mdf;
+    // Bluff:Value ratio for polarized bets (hero betting side)
+    const bluffRatio=Math.round(heroBetRatio/(1+2*heroBetRatio)*100);
+
+    // Blocker-aware bluff info
+    const bluffQ=bl?bl.bluffQuality:"poor";
+    const mkBluffInfo=()=>{
+      if(!bl||!isRiver)return null;
+      if(bluffQ==="value"||bluffQ==="showdown")return null;
+      let info="블러프 품질: ";
+      if(bluffQ==="excellent")info+="★★★ 넛블로커+쇼다운밸류없음";
+      else if(bluffQ==="good")info+="★★ 블로커보유+쇼다운밸류없음";
+      else if(bluffQ==="decent")info+="★ 스트레이트블로커";
+      else if(bluffQ==="marginal")info+="△ 블로커없음(블러프 비추)";
+      else info+="✕ 블러프 불가";
+      if(bl.nutBlock>0)info+=" · 넛블로커 "+bl.nutBlock+"장";
+      return info;
+    };
+
+    // Turn/River planning
+    const mkTurnPlan=(action)=>{
+      if(isRiver)return"MDF "+mdf+"% · 밸류:블러프 = "+(100-bluffRatio)+":"+bluffRatio;
+      if(street==="turn")return"리버: "+action+" · MDF "+mdf+"%";
+      if(isDry)return"브릭턴→배럴 "+Math.round(baseBetFreq*0.85)+"% | 스케어카드→체크↑";
+      if(isWet)return"브릭턴→배럴 "+Math.round(baseBetFreq*0.7)+"% | 드로우완성→체크/폴드";
+      if(isMono)return"4번째 플러시카드→"+(heroHasFlush?"밸류↑":"체크/폴드");
+      return"브릭턴→배럴 "+Math.round(baseBetFreq*0.75)+"%";
+    };
+    const mkExploit=()=>{
+      if(ex==="fold_heavy")return"블러프 빈도 +15% · 소벳 블러프 추가";
+      if(ex==="call_heavy")return"블러프 제거 · 밸류 사이징 +10%";
+      return"GTO 밸런스 유지";
+    };
+
+    // ═══ V4 RIVER SECTION (villain bet-aware) ═══
+    if(isRiver){
+      const bi=mkBluffInfo();
+      const vbLbl=villBet?"상대 "+villMdf.label+" 벳":"상대 벳 미입력(66%팟 가정)";
+      const callNeedLbl="필요승률 "+villMdf.needEq+"%";
+      // Nuts on river
+      if(isNuts||isMonster){
+        const sz=w>85?"1.2-1.5x팟":"0.75x팟";
+        return{act:"ALL-IN",bb:sz==="1.2-1.5x팟"?"올인":sz,cls:"act-allin",reason:HK[handN]+" — 리버 넛! 오버벳 밸류",positions:[
+          {p:posLbl+"선벳",a:"오버벳",bb:"1.2-1.5x팟",c:"st-raise"},
+          {p:"상대벳후",a:"올인",bb:"All-in",c:"st-raise"},
+          {p:"체크후",a:"빅벳",bb:"0.75x팟",c:"st-raise"},
+          {p:"멀티웨이",a:"빅벳",bb:"0.75x팟",c:"st-raise"}
+        ],freq:{bet:95,check:5},turnPlan:"밸류:블러프 = "+(100-bluffRatio)+":"+bluffRatio,exploit:ex==="call_heavy"?"오버벳↑ 콜스테이션 익스플로잇":mkExploit(),bluffInfo:null};
+      }
+      // Strong on river
+      if(isStrong){
+        const bf=Math.min(90,80+exValue);
+        return{act:"RAISE",bb:cbetSz,cls:"act-raise",reason:HK[handN]+" — 리버 밸류벳 ("+posLbl+")",positions:[
+          {p:posLbl+"선벳",a:"밸류벳",bb:cbetSz,c:"st-raise"},
+          {p:"상대벳후",a:"레이즈",bb:"2.5x",c:"st-raise"},
+          {p:"체크후",a:"밸류벳",bb:cbetSz,c:"st-raise"},
+          {p:"멀티웨이",a:"밸류벳",bb:"0.5x팟",c:"st-raise"}
+        ],freq:{bet:bf,check:100-bf},turnPlan:"밸류:블러프 = "+(100-bluffRatio)+":"+bluffRatio,exploit:mkExploit(),bluffInfo:null};
+      }
+      // Medium on river: thin value or check — call decision uses villain MDF
+      if(isMedium){
+        const canThinValue=w>55&&(isIP||ra==="hero");
+        const shouldCallVill=w>villMdf.needEq;
+        const bf=canThinValue?Math.min(70,baseBetFreq+15):20;
+        return{act:canThinValue?"RAISE":"CHECK",bb:canThinValue?cbetSz:"체크",cls:canThinValue?"act-raise":"act-check",reason:HK[handN]+" — 리버 "+(canThinValue?"씬밸류 ("+posLbl+")":"쇼다운 ("+posLbl+")"),positions:[
+          {p:posLbl+"선벳",a:canThinValue?"씬밸류":"체크",bb:canThinValue?cbetSz:"—",c:canThinValue?"st-raise":"st-call"},
+          {p:vbLbl,a:shouldCallVill?"콜":"폴드",bb:shouldCallVill?callNeedLbl:"승률부족",c:shouldCallVill?"st-call":"st-fold"},
+          {p:"체크후",a:canThinValue?"벳":"체크",bb:canThinValue?"0.33x팟":"—",c:canThinValue?"st-raise":"st-call"},
+          {p:"오버벳받음",a:w>60?"콜":"폴드",bb:w>60?"콜":"—",c:w>60?"st-call":"st-fold"}
+        ],freq:{bet:bf,check:100-bf},turnPlan:vbLbl+" → MDF "+villMdf.mdf+"% · "+callNeedLbl,exploit:mkExploit(),bluffInfo:null};
+      }
+      // One pair on river: bluff catch using VILLAIN bet-based MDF
+      if(isOnePair){
+        const shouldCall=w>villMdf.needEq;
+        return{act:shouldCall?"CHECK":"FOLD",bb:shouldCall?"블러프캐치":"폴드",cls:shouldCall?"act-check":"act-fold",reason:HK[handN]+" — 리버 "+(shouldCall?"블러프캐치 ("+callNeedLbl+")":"콜 불가 ("+callNeedLbl+")"),positions:[
+          {p:posLbl+"선벳",a:"체크",bb:"—",c:"st-call"},
+          {p:vbLbl,a:shouldCall?"콜":"폴드",bb:shouldCall?callNeedLbl:"승률부족",c:shouldCall?"st-call":"st-fold"},
+          {p:"오버벳받음",a:w>40?"히어로콜":"폴드",bb:w>40?callNeedLbl:"—",c:w>40?"st-call":"st-fold"},
+          {p:"MDF",a:villMdf.mdf+"%",bb:"방어필요",c:"st-call"}
+        ],freq:{bet:10,check:90},turnPlan:vbLbl+" → MDF "+villMdf.mdf+"% · "+callNeedLbl+" · 블로커 확인",exploit:ex==="fold_heavy"?"소벳 블러프 가능 (블로커 있으면)":mkExploit(),bluffInfo:bi};
+      }
+      // High card / missed draw on river: bluff or give up
+      if(isHighCard||(!hasOuts&&w<40)){
+        const canBluff=bluffQ==="excellent"||bluffQ==="good"||(bluffQ==="decent"&&ex==="fold_heavy");
+        const bf=canBluff?Math.min(bluffRatio+exBluff,50):0;
+        return{act:canBluff?"RAISE":"FOLD",bb:canBluff?cbetSz:"",cls:canBluff?"act-raise":"act-fold",reason:canBluff?"리버 블러프 — "+({excellent:"★★★넛블로커",good:"★★블로커",decent:"★블로커"}[bluffQ]||"블러프"):"리버 포기 — "+(bluffQ==="marginal"?"블로커없음":"쇼다운밸류없음"),positions:[
+          {p:posLbl+"선벳",a:canBluff?"블러프":"체크",bb:canBluff?cbetSz:"—",c:canBluff?"st-raise":"st-fold"},
+          {p:"상대벳후",a:"폴드",bb:"—",c:"st-fold"},
+          {p:"체크후",a:canBluff&&isIP?"블러프":"체크",bb:canBluff&&isIP?cbetSz:"—",c:canBluff&&isIP?"st-raise":"st-fold"},
+          {p:"블러프빈도",a:bf+"%",bb:"밸류:"+(100-bf)+"%",c:bf>0?"st-raise":"st-fold"}
+        ],freq:{bet:bf,check:100-bf},turnPlan:"밸류:블러프 = "+(100-bluffRatio)+":"+bluffRatio+" · 블러프 쿼터: "+bluffRatio+"%",exploit:ex==="fold_heavy"?"블러프 빈도↑ (폴드 과다 상대)":ex==="call_heavy"?"블러프 전부 제거":"블로커 기반 블러프만",bluffInfo:bi};
+      }
+    }
+
+    // ═══ FLOP/TURN (unchanged v2 logic with v3 enhancements) ═══
+    // Nuts / Near-nuts
+    if(isNuts){
+      return{act:"ALL-IN",bb:"올인",cls:"act-allin",reason:HK[handN]+" — 넛! 최대 밸류 ("+posLbl+")",positions:[
+        {p:posLbl+"선벳",a:"오버벳",bb:"1.2-1.5x팟",c:"st-raise"},
+        {p:"상대벳후",a:"올인",bb:"All-in",c:"st-raise"},
+        {p:"체크후",a:mw?"빅벳":"슬로플레이",bb:mw?"0.75x팟":"체크레이즈",c:"st-raise"},
+        {p:"멀티웨이",a:"빅벳",bb:"0.75x팟",c:"st-raise"}
+      ],freq:{bet:95,check:5},turnPlan:mkTurnPlan("밸류 극대화"),exploit:ex==="call_heavy"?"오버벳↑":mkExploit(),bluffInfo:null};
+    }
+    if(isMonster){
+      const sz=isDry?"0.75x팟":"0.66x팟";
+      return{act:"RAISE",bb:sz,cls:"act-raise",reason:HK[handN]+" — "+cbetLbl+" 밸류 ("+posLbl+")",positions:[
+        {p:posLbl+"선벳",a:"벳",bb:sz,c:"st-raise"},
+        {p:"상대벳후",a:"레이즈",bb:"2.5-3x",c:"st-raise"},
+        {p:"체크후",a:street==="flop"&&isIP?"슬로플레이":"벳",bb:street==="flop"&&isIP?"체크→턴벳":sz,c:"st-raise"},
+        {p:"멀티웨이",a:"벳",bb:"0.66x팟",c:"st-raise"}
+      ],freq:{bet:85,check:15},turnPlan:mkTurnPlan("밸류 배럴"),exploit:mkExploit(),bluffInfo:null};
+    }
+    if(isStrong){
+      const bf=Math.min(90,75+exValue);
+      if(w>65)return{act:"RAISE",bb:isDry?"0.66x팟":cbetSz,cls:"act-raise",reason:HK[handN]+" — "+cbetLbl+" 밸류 ("+posLbl+")"+(isWet?" 프로텍션":""),positions:[
+        {p:posLbl+"선벳",a:"벳",bb:isDry?"0.66x팟":"0.5x팟",c:"st-raise"},
+        {p:"상대벳후",a:mw?"콜":"레이즈",bb:mw?"콜":"2.5x",c:mw?"st-call":"st-raise"},
+        {p:"체크후",a:"벳",bb:"0.5x팟",c:"st-raise"},
+        {p:"멀티웨이",a:"벳",bb:"0.5x팟",c:"st-raise"}
+      ],freq:{bet:bf,check:100-bf},turnPlan:mkTurnPlan("밸류 배럴"),exploit:mkExploit(),bluffInfo:null};
+      return{act:"RAISE",bb:"0.5x팟",cls:"act-raise",reason:HK[handN]+" — 미디엄 밸류 ("+posLbl+")",positions:[
+        {p:posLbl+"선벳",a:"벳",bb:"0.33-0.5x팟",c:"st-raise"},
+        {p:"상대벳후",a:"콜",bb:"콜",c:"st-call"},
+        {p:"체크후",a:"벳",bb:cbetSz,c:"st-raise"},
+        {p:"멀티웨이",a:"체크/콜",bb:cbetSz,c:"st-call"}
+      ],freq:{bet:60,check:40},turnPlan:mkTurnPlan("상황판단 후 배럴/체크"),exploit:mkExploit(),bluffInfo:null};
+    }
+    if(isMedium){
+      if(w>55){const bf=Math.min(85,baseBetFreq+20);return{act:"RAISE",bb:cbetSz,cls:"act-raise",reason:HK[handN]+" — "+cbetLbl+" 밸류 ("+posLbl+")",positions:[
+        {p:posLbl+"선벳",a:"벳",bb:cbetSz,c:"st-raise"},
+        {p:"상대벳후",a:mw?"콜":"레이즈",bb:mw?"콜":"2.5x",c:mw?"st-call":"st-raise"},
+        {p:"체크후",a:"벳",bb:cbetSz,c:"st-raise"},
+        {p:"멀티웨이",a:"벳",bb:"0.33x팟",c:"st-raise"}
+      ],freq:{bet:bf,check:100-bf},turnPlan:mkTurnPlan("밸류 배럴"),exploit:mkExploit(),bluffInfo:null}}
+      return{act:"CHECK",bb:"팟컨트롤",cls:"act-check",reason:HK[handN]+" — "+cbetLbl+" 팟컨트롤 ("+posLbl+")",positions:[
+        {p:posLbl+"선벳",a:"체크/콜",bb:"—",c:"st-call"},
+        {p:"소벳",a:"콜",bb:"콜",c:"st-call"},
+        {p:"빅벳",a:"콜",bb:"콜",c:"st-call"},
+        {p:"체크후",a:"소벳",bb:cbetSz,c:"st-raise"}
+      ],freq:{bet:35,check:65},turnPlan:mkTurnPlan("체크/콜 위주"),exploit:mkExploit(),bluffInfo:null};
+    }
+    if(isOnePair&&w>50){
+      const bf=Math.min(80,baseBetFreq+10);
+      return{act:"RAISE",bb:cbetSz,cls:"act-raise",reason:HK[handN]+" — "+cbetLbl+" 씬밸류 ("+posLbl+")",positions:[
+        {p:posLbl+"선벳",a:isIP?"벳":"체크",bb:isIP?cbetSz:"—",c:isIP?"st-raise":"st-call"},
+        {p:isIP?"체크후":"상대벳후",a:isIP?"벳":"콜",bb:isIP?cbetSz:"콜",c:isIP?"st-raise":"st-call"},
+        {p:"상대벳후",a:"콜",bb:"콜",c:"st-call"},
+        {p:"멀티웨이",a:ra==="hero"&&isIP?"소벳":"체크",bb:ra==="hero"&&isIP?"0.25x팟":"—",c:ra==="hero"&&isIP?"st-raise":"st-call"}
+      ],freq:{bet:bf,check:100-bf},turnPlan:isDry?"브릭턴→2nd배럴 "+(bf-15)+"% | 오버카드→체크":"스케어카드→체크/폴드",exploit:mkExploit(),bluffInfo:null};
+    }
+    // Combo draw (12+ outs)
+    if(hasOuts&&outsN>=12){
+      const bf=Math.min(90,70+exBluff);
+      return{act:"RAISE",bb:cbetSz,cls:"act-raise",reason:"콤보드로우 "+outsN+"아웃"+(op?" ("+op+"%)":"")+" — 세미블러프 ("+posLbl+")",positions:[
+        {p:posLbl+"선벳",a:"세미블러프",bb:cbetSz,c:"st-raise"},
+        {p:"상대벳후",a:mw?"콜":"레이즈",bb:mw?"콜":"2.5x",c:mw?"st-call":"st-raise"},
+        {p:"체크후",a:"세미블러프",bb:"0.5x팟",c:"st-raise"},
+        {p:"멀티웨이",a:"콜",bb:"콜",c:"st-call"}
+      ],freq:{bet:bf,check:100-bf},turnPlan:"드로우 완성→밸류 | 미스→"+(street==="flop"?"턴 배럴 50%":"리버 블러프(블로커확인)"),exploit:ex==="fold_heavy"?"세미블러프↑":"밸런스 유지",bluffInfo:null};
+    }
+    // Strong draw (8-11 outs)
+    if(hasOuts&&outsN>=8){
+      const canSemi=w>35&&!mw&&(isIP||ra==="hero");
+      const bf=canSemi?Math.min(75,baseBetFreq+15+exBluff):Math.max(10,25-exFold);
+      if(canSemi)return{act:"RAISE",bb:cbetSz,cls:"act-raise",reason:"세미블러프 "+outsN+"아웃"+(op?" ("+op+"%)":"")+" ("+posLbl+")",positions:[
+        {p:posLbl+"선벳",a:"세미블러프",bb:cbetSz,c:"st-raise"},
+        {p:"상대벳후",a:"콜",bb:"콜",c:"st-call"},
+        {p:"체크후",a:isIP?"벳":"체크",bb:isIP?cbetSz:"—",c:isIP?"st-raise":"st-call"},
+        {p:"멀티웨이",a:"콜",bb:"콜",c:"st-call"}
+      ],freq:{bet:bf,check:100-bf},turnPlan:"드로우 완성→밸류 | 미스→체크(리버 블러프 여부 블로커 확인)",exploit:mkExploit(),bluffInfo:null};
+      return{act:"CALL",bb:"콜",cls:"act-call",reason:"드로우 "+outsN+"아웃"+(op?" ("+op+"%)":"")+" — 팟오즈 ("+posLbl+")",positions:[
+        {p:posLbl+"선벳",a:"체크",bb:"—",c:"st-call"},
+        {p:"소벳",a:"콜",bb:"콜",c:"st-call"},
+        {p:"빅벳",a:street==="flop"?"콜":"폴드",bb:street==="flop"?"콜":"—",c:street==="flop"?"st-call":"st-fold"},
+        {p:"멀티웨이",a:"콜",bb:"콜",c:"st-call"}
+      ],freq:{bet:bf,check:100-bf},turnPlan:"드로우 완성→밸류 | 미스→팟오즈 재계산",exploit:mkExploit(),bluffInfo:null};
+    }
+    // Weak draw (4-7 outs)
+    if(hasOuts&&outsN>=4){
+      const potOdds=street==="flop"?(outsN*4):outsN*2;
+      const bf=Math.max(5,Math.min(40,baseBetFreq-10+exBluff));
+      return{act:"CHECK",bb:"체크",cls:"act-check",reason:"약한 드로우 "+outsN+"아웃 (~"+potOdds+"% 2·4룰) ("+posLbl+")",positions:[
+        {p:posLbl+"선벳",a:"체크",bb:"—",c:"st-call"},
+        {p:"소벳",a:"콜",bb:"콜",c:"st-call"},
+        {p:"빅벳",a:"폴드",bb:"—",c:"st-fold"},
+        {p:"블러프",a:isDry&&!mw&&isIP?"소벳":"체크",bb:isDry&&!mw&&isIP?cbetSz:"—",c:isDry&&!mw&&isIP?"st-raise":"st-fold"}
+      ],freq:{bet:bf,check:100-bf},turnPlan:"드로우 완성→밸류 | 미스→리버 블로커 체크 후 블러프 여부 결정",exploit:ex==="fold_heavy"?"소벳 블러프 추가":"블러프 자제",bluffInfo:null};
+    }
+    // Equity-based fallback
+    const t_allin=mw?75:80, t_value=mw?55:60, t_cbet=mw?42:48, t_check=mw?32:38;
+    if(w>t_allin){return{act:"ALL-IN",bb:"올인",cls:"act-allin",reason:"승률 "+w+"% — "+cbetLbl+" 밸류올인",positions:[
+      {p:posLbl+"선벳",a:"오버벳",bb:"1.2x팟+",c:"st-raise"},
+      {p:"상대벳후",a:"올인",bb:"All-in",c:"st-raise"},
+      {p:"체크후",a:"빅벳",bb:"0.75x팟",c:"st-raise"},
+      {p:"멀티웨이",a:"빅벳",bb:"0.66x팟",c:"st-raise"}
+    ],freq:{bet:90,check:10},turnPlan:mkTurnPlan("밸류 극대화"),exploit:mkExploit(),bluffInfo:null}}
+    if(w>t_value){const bf=Math.min(85,baseBetFreq+15);return{act:"RAISE",bb:cbetSz,cls:"act-raise",reason:"승률 "+w+"% — "+cbetLbl+" 밸류",positions:[
+      {p:posLbl+"선벳",a:"벳",bb:cbetSz,c:"st-raise"},
+      {p:isIP?"체크후":"상대벳후",a:isIP?"벳":mw?"콜":"레이즈",bb:isIP?cbetSz:mw?"콜":"2.5x",c:isIP?"st-raise":mw?"st-call":"st-raise"},
+      {p:"상대벳후",a:mw?"콜":"레이즈",bb:mw?"콜":"2.5x",c:mw?"st-call":"st-raise"},
+      {p:"멀티웨이",a:"벳",bb:"0.33x팟",c:"st-raise"}
+    ],freq:{bet:bf,check:100-bf},turnPlan:mkTurnPlan("밸류 배럴"),exploit:mkExploit(),bluffInfo:null}}
+    if(w>t_cbet){const bf=Math.max(15,baseBetFreq-5);return{act:"CHECK",bb:"체크/콜",cls:"act-check",reason:"승률 "+w+"% — "+cbetLbl+" 팟컨트롤",positions:[
+      {p:posLbl,a:isDry&&isIP?"소벳":"체크",bb:isDry&&isIP?cbetSz:"—",c:isDry&&isIP?"st-raise":"st-call"},
+      {p:"상대소벳",a:"콜",bb:"콜",c:"st-call"},
+      {p:"상대빅벳",a:"콜",bb:"콜",c:"st-call"},
+      {p:"체크스루",a:isIP?"소벳":"체크",bb:isIP?"0.25x팟":"—",c:isIP?"st-raise":"st-call"}
+    ],freq:{bet:bf,check:100-bf},turnPlan:mkTurnPlan("체크/콜 위주"),exploit:mkExploit(),bluffInfo:null}}
+    if(w>t_check){const bf=Math.max(5,15+exBluff-exFold);return{act:"FOLD",bb:"체크→폴드",cls:"act-fold",reason:"승률 "+w+"% — "+cbetLbl+" 쇼다운밸류↓",positions:[
+      {p:posLbl+"선벳",a:"체크",bb:"—",c:"st-fold"},
+      {p:"소벳",a:street==="flop"?"콜":"폴드",bb:street==="flop"?"콜":"—",c:street==="flop"?"st-call":"st-fold"},
+      {p:"빅벳",a:"폴드",bb:"—",c:"st-fold"},
+      {p:"블러프",a:isDry&&!mw&&isIP&&ex==="fold_heavy"?"소벳":"폴드",bb:isDry&&!mw&&isIP&&ex==="fold_heavy"?cbetSz:"—",c:isDry&&!mw&&isIP&&ex==="fold_heavy"?"st-raise":"st-fold"}
+    ],freq:{bet:bf,check:100-bf},turnPlan:"체크/폴드",exploit:mkExploit(),bluffInfo:null}}
+    return{act:"FOLD",bb:"",cls:"act-fold",reason:"승률 "+w+"% — 폴드",positions:[
+      {p:"모든상황",a:"폴드",bb:"—",c:"st-fold"},
+      {p:"BB체크",a:"체크",bb:"—",c:"st-fold"},
+      {p:"벳받으면",a:"폴드",bb:"—",c:"st-fold"},
+      {p:"프리카드",a:"체크",bb:"—",c:"st-fold"}
+    ],freq:{bet:0,check:100},turnPlan:"폴드",exploit:mkExploit(),bluffInfo:null};
+  },[hole,board,wr,pf,hand,oi,op,numOpp,boardTex,exploitMode,heroPos,blockerInfo,villBet]);
+
+  const handOutsN=oi?oi.outs.length:0;
+
+  // ══════════ RENDER ══════════
+  return e("div",{className:"app"},
+    // ── TOP BAR ──
+    e("div",{className:"topbar"},
+      e("span",{className:"logo"},"♠ HUD"),
+      e("div",{className:"cards-row"},
+        // Hero cards
+        [0,1].map(i=>{const c=hole[i];
+          return e("div",{key:"h"+i,className:"card-slot "+(c?"hero":"empty"),onClick:()=>c&&rmH(i)},
+            c?[e("span",{key:"x",className:"x-btn"},"✕"),e("span",{key:"r",className:"rank "+SC[c.suit]},c.rank),e("span",{key:"s",className:"suit "+SC[c.suit]},c.suit)]
+            :e("span",{className:"slot-lbl"},"H"+(i+1))
+          )}),
+        e("div",{className:"sep"}),
+        // Board cards
+        [0,1,2,3,4].map(i=>{const c=board[i];const lbl=i<3?"F":i===3?"T":"R";
+          return e("div",{key:"b"+i,className:"card-slot "+(c?"board":"empty"),onClick:()=>c&&rmB(i)},
+            c?[e("span",{key:"x",className:"x-btn"},"✕"),e("span",{key:"r",className:"rank "+SC[c.suit]},c.rank),e("span",{key:"s",className:"suit "+SC[c.suit]},c.suit)]
+            :e("span",{className:"slot-lbl"},lbl)
+          )})
+      ),
+      e("button",{className:"reset-btn",onClick:reset},"RESET"),
+      e("span",{className:"stage-badge",style:{background:stCol+"18",color:stCol}},stage),
+      e("div",{className:"ctrl-group"},
+        e("label",null,"상대"),
+        [1,2,3,4,5,6,7,8].map(n=>e("button",{key:n,className:"opp-btn"+(numOpp===n?" on":""),onClick:()=>setNumOpp(n)},n))
+      ),
+      e("div",{className:"exploit-row"},
+        e("button",{className:"ex-btn"+(exploitMode==="gto"?" ex-gto":""),onClick:()=>setExploitMode("gto")},"GTO"),
+        e("button",{className:"ex-btn"+(exploitMode==="fold_heavy"?" ex-fold":""),onClick:()=>setExploitMode("fold_heavy")},"vs폴드"),
+        e("button",{className:"ex-btn"+(exploitMode==="call_heavy"?" ex-call":""),onClick:()=>setExploitMode("call_heavy")},"vs콜")
+      ),
+      e("div",{className:"pos-toggle"},
+        e("button",{className:"pt-btn"+(heroPos==="IP"?" pt-ip":""),onClick:()=>setHeroPos("IP")},"IP"),
+        e("button",{className:"pt-btn"+(heroPos==="OOP"?" pt-oop":""),onClick:()=>setHeroPos("OOP")},"OOP")
+      ),
+      board.length===5?e("div",{className:"vb-row"},
+        e("span",{className:"vb-lbl"},"상대벳"),
+        [["33%",0.33],["50%",0.5],["66%",0.66],["pot",1.0],["1.5x",1.5]].map(([l,v])=>
+          e("button",{key:l,className:"vb-btn"+(villBet===v?" vb-on":""),onClick:()=>setVillBet(villBet===v?null:v)},l)
+        )
+      ):null
+    ),
+
+    // ── HERO DISPLAY ──
+    e("div",{className:"hero-display"},
+      hole.length<2?
+        e("div",{className:"empty-state"},e("span",{className:"icon"},"🃏"),e("span",{className:"msg"},"카드를 선택하세요"),e("span",{className:"sub"},"아래 덱에서 클릭"))
+      :e(React.Fragment,null,
+        // Section 1: Hand name + Win rate
+        e("div",{className:"hero-sec-wr"},
+          hand?e("div",{className:"hand-name",style:{color:stCol}},
+            HK[hand.n],
+            pf?e("span",{className:"tier-badge mono",style:{background:tc[pf.tier]+"18",color:tc[pf.tier]}},pf.nm+" · "+pf.tier+(pf.pos!=="—"?" · "+pf.pos:"")):null
+          ):pf?e("div",{className:"hand-name",style:{color:tc[pf.tier]}},
+            e("span",{className:"tier-badge mono",style:{background:tc[pf.tier]+"18",color:tc[pf.tier]}},pf.nm+" · "+pf.tier+(pf.pos!=="—"?" · "+pf.pos:""))
+          ):null,
+          wr?e(React.Fragment,null,
+            e("div",{className:"wr-big"},
+              e("span",{className:"num",style:{color:parseFloat(wr.win)>60?"#30c860":parseFloat(wr.win)>45?"#f0c040":"#ff4444"}},wr.win),
+              e("span",{className:"pct"},"%"),
+              e("span",{className:"lbl"},"승률")
+            ),
+            e("div",{className:"wr-sub"},
+              e("div",{className:"item"},e("span",{className:"l"},"무승부"),e("span",{className:"v mono",style:{color:"#f0c040"}},wr.tie+"%")),
+              e("div",{className:"item"},e("span",{className:"l"},"패배"),e("span",{className:"v mono",style:{color:"#ff4444"}},wr.lose+"%")),
+              oi&&handOutsN>0?e("div",{className:"item"},e("span",{className:"l"},"아웃"),e("span",{className:"v mono",style:{color:"#4a9eff"}},handOutsN+"장")):null,
+              op?e("div",{className:"item"},e("span",{className:"l"},"개선"),e("span",{className:"v mono",style:{color:"#b09dff"}},op+"%")):null
+            ),
+            e("div",{className:"wr-meta"},"MC "+wr.n+"회 ±"+wr.err+"% · vs "+numOpp+"명 랜덤")
+          ):null
+        ),
+        // Section 2: Action + Freq + Turn Plan
+        betRec?e("div",{className:"hero-sec-act"},
+          e("div",{className:"action-bar "+betRec.cls},
+            e("div",{style:{flex:1}},
+              e("div",{className:"act"},betRec.act,betRec.bb?e("span",{className:"bb"}," "+betRec.bb):null),
+              e("div",{className:"reason"},betRec.reason)
+            )
+          ),
+          // Frequency bar
+          betRec.freq?e("div",{className:"freq-bar"},
+            e("span",{className:"freq-lbl",style:{color:"#30c860"}},"벳 "+betRec.freq.bet+"%"),
+            e("div",{className:"freq-track"},
+              e("div",{className:"freq-fill-bet",style:{width:betRec.freq.bet+"%"}}),
+              e("div",{className:"freq-fill-chk",style:{width:betRec.freq.check+"%"}})
+            ),
+            e("span",{className:"freq-lbl",style:{color:"rgba(255,255,255,0.5)"}},"체크 "+betRec.freq.check+"%")
+          ):null,
+          // Turn plan
+          betRec.turnPlan&&board.length>=3?e("div",{className:"turn-plan"},
+            e("span",{className:"tp-lbl"},board.length===3?"턴 플랜 ▸ ":board.length===4?"리버 플랜 ▸ ":""),
+            betRec.turnPlan
+          ):null,
+          // Exploit hint
+          betRec.exploit?e("div",{className:"exploit-hint",style:{marginTop:2}},
+            exploitMode==="gto"?"⚖":"⚡",
+            " ",betRec.exploit
+          ):null,
+          // Bluff info (river only)
+          betRec.bluffInfo?e("div",{className:"bluff-info"},
+            "🎯 ",betRec.bluffInfo
+          ):null
+        ):null,
+        // Section 3: Mobile toggle + Position grid
+        betRec&&betRec.positions?e(React.Fragment,null,
+          e("div",{className:"mob-pos-toggle",onClick:()=>setMobPosShow(p=>!p)},
+            e("span",null,mobPosShow?"▼ 포지션별 닫기":"▶ 포지션별 추천")
+          ),
+          e("div",{className:"hero-sec-pos"+(mobPosShow?" mob-show":"")},
+            e("div",{className:"pos-grid"},
+              betRec.positions.map(x=>e("div",{key:x.p,className:"pos-cell"},
+                e("span",{className:"pn"},x.p),
+                e("span",{className:"pa "+x.c},x.a),
+                x.bb&&x.bb!=="—"?e("span",{className:"pb"},x.bb):null
+              ))
+            )
+          )
+        ):null
+      )
+    ),
+
+    // ── CARD DECK ──
+    e("div",{className:"deck-area"},
+      e("div",{className:"deck-label"},"클릭 → 자동배치 | 다시 클릭 → 취소"),
+      e("div",{className:"deck"},
+        S.map(suit=>R.map(rank=>{
+          const k=rank+suit,u=sel[k];
+          return e("button",{key:k,className:"cd"+(u==="h"?" cd-hero":u==="b"?" cd-board":""),onClick:()=>click(rank,suit)},
+            u==="h"?e("span",{className:"cd-badge",style:{background:"#f0c040"}},"H"):null,
+            u==="b"?e("span",{className:"cd-badge",style:{background:"#4488dd"}},"B"):null,
+            e("span",{className:"cr "+SC[suit]},rank),
+            e("span",{className:"cs "+SC[suit]},suit)
+          )
+        })).flat()
+      )
+    ),
+
+    // ── DETAIL TOGGLE ──
+    hole.length>=2?e("div",{className:"detail-toggle",onClick:()=>setShowDetail(p=>!p)},
+      e("span",null,showDetail?"▼ 상세 닫기":"▲ 상세 보기 (핸드확률 · 아웃츠 · 드로우)")
+    ):null,
+
+    // ── DETAIL PANEL ──
+    hole.length>=2?e("div",{className:"detail "+(showDetail?"open":"closed")},
+      e("div",{className:"detail-inner"},
+        // Col 1: Hand probabilities
+        probs?e("div",{className:"det-col"},
+          e("div",{className:"det-title"},"핸드 확률",probsExact?e("span",{style:{color:"#30c860",marginLeft:4}},"정확값"):e("span",{style:{marginLeft:4}},"MC 3000회")),
+          HR.map(h=>{
+            const v=parseFloat(probs[h]),ic=hand&&hand.n===h;
+            let cl=v>20?"#30c860":v>5?"#4a9eff":v>1?"#b09dff":"rgba(255,255,255,0.3)";
+            if(ic)cl="#f0c040";
+            return e("div",{key:h},
+              e("div",{className:"prob-row"+(ic?" hi":"")},
+                e("span",{className:"pname"+(ic?" hi":"")},ic?"★ ":"",HK[h]),
+                e("span",{className:"pval mono",style:{color:cl}},probs[h]+"%")
+              ),
+              e("div",{className:"prob-bar"},e("div",{className:"prob-fill",style:{width:Math.min(v,100)+"%",background:cl}}))
+            );
+          })
+        ):null,
+        // Col 2: Outs + Draw table
+        e("div",{className:"det-col"},
+          board.length>=3&&hole.length>=2?e(React.Fragment,null,
+            e("div",{className:"det-title"},"아웃츠"),
+            e("div",{className:"outs-mode-btns"},
+              e("button",{className:"om-btn"+(outsMode==="hand"?" on":""),onClick:()=>setOutsMode("hand")},"핸드 ("+handOutsN+")"),
+              e("button",{className:"om-btn"+(outsMode==="equity"?" on":""),onClick:()=>setOutsMode("equity")},"에퀴티"+(outsMode==="equity"?" ("+eqOuts.length+")":""))
+            ),
+            outsMode==="hand"&&handOutsN>0?e(React.Fragment,null,
+              e("div",{className:"outs-box"},
+                e("div",{className:"outs-stat",style:{background:"rgba(48,200,90,0.04)"}},e("div",{className:"ol"},"아웃"),e("div",{className:"ov",style:{color:"#30c860"}},handOutsN)),
+                op?e("div",{className:"outs-stat",style:{background:"rgba(70,140,255,0.04)"}},e("div",{className:"ol"},"확률"),e("div",{className:"ov",style:{color:"#4a9eff"}},op+"%")):null,
+                e("div",{className:"outs-stat",style:{background:"rgba(170,150,255,0.04)"}},e("div",{className:"ol"},"팟오즈"),e("div",{className:"ov",style:{color:"#b09dff"}},"1:"+(((oi.tot-handOutsN)/handOutsN).toFixed(1))))
+              ),
+              Object.keys(og).map(name=>e("div",{key:name,style:{marginBottom:4}},
+                e("div",{style:{fontSize:10,fontWeight:700,color:"#f0c040",marginBottom:2}},"→ "+(HK[name]||name)+" ("+og[name].length+")"),
+                e("div",{className:"outs-cards"},og[name].map(c=>e("div",{key:c.rank+c.suit,className:"oc"},e("span",{className:"ocr "+SC[c.suit]},c.rank),e("span",{className:"ocs "+SC[c.suit]},c.suit))))
+              )),
+              e("div",{className:"rule-box"},"💡 ",board.length===3?["아웃×4 ≈ ",e("span",{key:"h",className:"hlg"},handOutsN+"×4="+handOutsN*4+"%")]:["아웃×2 ≈ ",e("span",{key:"h",className:"hlg"},handOutsN+"×2="+handOutsN*2+"%")])
+            ):outsMode==="hand"?e("div",{style:{fontSize:12,color:"rgba(255,255,255,0.5)",padding:8,textAlign:"center"}},"핸드 개선 아웃 없음"):null,
+            outsMode==="equity"?e(React.Fragment,null,
+              e("div",{style:{fontSize:11,color:"rgba(255,255,255,0.6)",marginBottom:4}},"vs "+numOpp+"명 · 승률 +3% 이상 개선"),
+              e("div",{className:"outs-box"},
+                e("div",{className:"outs-stat",style:{background:"rgba(48,200,90,0.04)"}},e("div",{className:"ol"},"에퀴티 아웃"),e("div",{className:"ov",style:{color:"#30c860"}},eqOuts.length)),
+                e("div",{className:"outs-stat",style:{background:"rgba(70,140,255,0.04)"}},e("div",{className:"ol"},"핸드 아웃"),e("div",{className:"ov",style:{color:"#4a9eff"}},handOutsN)),
+                e("div",{className:"outs-stat",style:{background:"rgba(170,150,255,0.04)"}},e("div",{className:"ol"},"차이"),e("div",{className:"ov",style:{color:eqOuts.length<handOutsN?"#ff4444":"#30c860"}},(eqOuts.length-handOutsN>0?"+":"")+(eqOuts.length-handOutsN)))
+              ),
+              eqOuts.length>0?e("div",{className:"outs-cards"},eqOuts.map(o=>e("div",{key:o.card.rank+o.card.suit,className:"oc eq"},e("span",{className:"ocr "+SC[o.card.suit]},o.card.rank),e("span",{className:"ocs "+SC[o.card.suit]},o.card.suit)))):e("div",{style:{fontSize:12,color:"rgba(255,255,255,0.5)",padding:8,textAlign:"center"}},"에퀴티 아웃 없음")
+            ):null
+          ):null,
+          // Draw probability table (always show)
+          e("div",{style:{marginTop:board.length>=3?8:0}},
+            e("div",{className:"det-title",style:{color:"#4a9eff"}},"드로우 확률"),
+            e("div",{className:"draw-tbl"},
+              e("div"),e("div",{className:"dh"},"플랍→리버"),e("div",{className:"dh"},"턴→리버"),
+              [{n:"플러시 드로우(9)",f:"35.0%",t:"19.6%"},{n:"오픈엔드(8)",f:"31.5%",t:"17.4%"},{n:"거트샷(4)",f:"16.5%",t:"8.7%"},{n:"세트(2)",f:"8.4%",t:"4.3%"}].map(d=>e(React.Fragment,{key:d.n},
+                e("div",{className:"dn"},d.n),
+                e("div",{className:"dv",style:{color:"#30c860"}},d.f),
+                e("div",{className:"dv",style:{color:"#4a9eff"}},d.t)
+              ))
+            )
+          )
+        )
+      )
+    ):null
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(e(App));
+</script>
+<script>if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{})}</script>
+</body>
+</html>
