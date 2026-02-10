@@ -840,8 +840,7 @@ function App(){
   return e("div",{className:"app"},
     // ── TOP BAR ──
     e("div",{className:"topbar"},
-      e("span",{className:"logo"},"♠ HUD"),
-      e("span",{style:{fontSize:10,color:"rgba(255,255,255,0.4)",fontWeight:700,letterSpacing:".5px",marginLeft:2}},"by KHS"),
+      e("span",{className:"logo"},"♠ HUD ",e("span",{style:{fontSize:9,color:"rgba(255,255,255,0.4)",fontWeight:700,fontFamily:"'JetBrains Mono',monospace"}},"KHS")),
       e("div",{className:"cards-row"},
         // Hero cards
         [0,1].map(i=>{const c=hole[i];
